@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>common calendar</title>
+	<script type="text/javascript" src="../node_modules/moment/moment.js"></script>
+	<script type="text/javascript" src="../dist/calendar.js"></script>
+</head>
+<body>
+	<script type="text/javascript">
+		var startMonth = new Date();
+		var endMonth = new Date(startMonth.valueOf())
+		endMonth.setMonth(endMonth.getMonth()+1)
+		debugger;
+		var calendar = new Calendar({
+			endMonth:endMonth
+		})
+	</script>
+	
+</body>
+</html>

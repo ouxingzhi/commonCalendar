@@ -1,0 +1,164 @@
+"use strict";
+
+function CDate(date){
+	if(!(this instanceof CDate)){
+		return new CDate(date);
+	}
+	this.date = clone(date);
+	setZero(this.date);
+}
+
+CDate.prototype = {
+	constructor:CDate,
+	addDay:function(day){
+		this.date.setDate(this.date.getDate()+day)
+		return this;
+	},
+	subDay:function(day){
+		this.date.setDate(this.date.getDate()-day);
+		return this;
+	},
+	addMonth:function(month){
+		this.date.setMonth(this.date.getMonth()+month)
+		return this;
+	},
+	subMonth:function(month){
+		this.date.setMonth(this.date.getMonth()-month);
+		return this;
+	},
+	valueOf:function(){
+		return clone(this.date);
+	},
+	clone:function(){
+		return new CDate(this.date);
+	}
+}
+
+exports.CDate = CDate;
+
+var setZero = function(date){
+	date.setHours(0,0,0,1);
+	return date;
+}
+
+exports.setZero = setZero;
+
+var clone = function(date, isZero){
+	date = new Date(date.valueOf());
+	if(isZero){
+		setZero(date);
+	}
+	return date;
+}
+
+var getMonthFirstDay = function(month){
+	month = clone(month,true);
+	month.setDate(1);
+	setZero(month);
+	return month;
+}
+
+var getMonthLastDay = function(month){
+	month = clone(month,true);
+	month.setMonth(month.getMonth()+1);
+	month.setDate(0);
+	return month;
+};
+
+var setNextMonthFirstDay = function(month){
+	month.setMonth(month.getMonth()+1);
+	setZero(month);
+}
+
+var setPreMonthLastDay = function(month){
+	month.setDate(0);
+	setZero(month);
+};
+
+var getNextMonthFirstDay = function(month){
+	month = clone(month);
+	setNextMonthFirstDay(month);
+	return month;
+}
+
+var getPreMonthLastDay = function(month){
+	month = clone(month);
+	setPreMonthLastDay(month);
+	return month;
+};
+
+var diffMonth = function(a, b){
+	a = clone(a,true);
+	b = clone(b,true);
+	var i = 0;
+	if(a.valueOf() < b.valueOf()){
+		for(;a.valueOf() < b.valueOf();){
+			i++;
+			a.setMonth(a.getMonth()+i);
+		}
+	}
+	return i;
+}
+
+exports.diffMonth = diffMonth;
+
+exports.createMonth = function(month, startDay){
+	month = clone(month);
+	setZero(month);
+	startDay = startDay || 0;
+	var firstDate = getMonthFirstDay(month);
+	var lastDate = getMonthLastDay(month);
+	console.log(firstDate,lastDate)
+	var lastDay = lastDate.getDay();
+	var firstDay = firstDate.getDay();
+	var startNum = startDay - firstDay;
+	if(startNum < 0) startNum = 6 + startNum;
+	console.log(startDay,firstDay)
+	firstDate.setDate(-startNum);
+	var endNum = 6 - (lastDay + startDay);
+	var end = lastDate.getDate() + startNum + endNum;
+	var cur;
+	var weeks = [];
+	var week = [];
+	console.log(startNum,endNum);
+	for(var i=1;i<=end;i++){
+		cur = CDate(firstDate).addDay(i);
+		//console.log(cur.date.toLocaleDateString(),cur.date.getDay());
+		week.push(cur.valueOf());
+		if(i%7 == 0){
+			weeks.push(week);
+			week = [];
+		}
+	}
+	if(week.length){
+		weeks.push(week);
+	}
+	return weeks;
+};
+
+var WEEKMAP = [
+	'日',
+	'一',
+	'二',
+	'三',
+	'四',
+	'五',
+	'六'
+];
+var weekNumToChina = function(week){
+	return WEEKMAP[week];
+};
+
+exports.weekNumToChina = weekNumToChina;
+
+exports.createElement = function(html,rootTagName){
+	rootTagName = rootTagName || 'div';
+	var c = document.createElement(rootTagName);
+	c.innerHTML = html;
+	var el = c.childNodes[0];
+	c.removeChild(el);
+	c = null;
+	return el;
+}
+
+
