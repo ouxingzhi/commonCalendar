@@ -51,6 +51,8 @@ var clone = function(date, isZero){
 	return date;
 }
 
+exports.clone = clone;
+
 var getMonthFirstDay = function(month){
 	month = clone(month,true);
 	month.setDate(1);
@@ -108,15 +110,19 @@ exports.createMonth = function(month, startDay){
 	startDay = startDay || 0;
 	var firstDate = getMonthFirstDay(month);
 	var lastDate = getMonthLastDay(month);
+
 	console.log(firstDate,lastDate)
 	var lastDay = lastDate.getDay();
 	var firstDay = firstDate.getDay();
+
 	var startNum = startDay - firstDay;
-	if(startNum < 0) startNum = 6 + startNum;
+	if(startNum > 0) startNum = startNum - 7;
 	console.log(startDay,firstDay)
-	firstDate.setDate(-startNum);
-	var endNum = 6 - (lastDay + startDay);
-	var end = lastDate.getDate() + startNum + endNum;
+
+
+	firstDate.setDate(startNum);
+	var endNum = 7 - Math.abs(startNum);
+	var end = lastDate.getDate() + Math.abs(startNum) + Math.abs(endNum);
 	var cur;
 	var weeks = [];
 	var week = [];
@@ -133,6 +139,7 @@ exports.createMonth = function(month, startDay){
 	if(week.length){
 		weeks.push(week);
 	}
+	weeks.month = month;
 	return weeks;
 };
 
