@@ -1,5 +1,14 @@
 "use strict";
 
+Array.prototype.indexOf = Array.prototype.indexOf || function(obj){
+	for(var i=0;i<this.length;i++){
+		if(obj === this[i]) return i;
+	}
+	return -1;
+}
+
+
+
 function CDate(date){
 	if(!(this instanceof CDate)){
 		return new CDate(date);
@@ -168,4 +177,21 @@ exports.createElement = function(html,rootTagName){
 	return el;
 }
 
+
+exports.addClass = function(el,cls){
+	var reg = new RegExp('(?:^|\\s+)' + cls + '(?:$|\\s+)','im');
+	!reg.test(el.className) && (el.className += ' ' + cls);
+}
+
+exports.delClass = function(el,cls){
+	var reg = new RegExp('(?:^|\\s+)' + cls + '(?:$|\\s+)','img');
+	el.className = el.className.replace(reg,' ');
+}
+
+exports.indexOfDate = function(arr,date){
+	for(var i=0;i<arr.length;i++){
+		if(arr[i] && arr[i].valueOf() === date.valueOf()) return i;
+	}
+	return -1;
+}
 

@@ -5,12 +5,22 @@
 	<title>common calendar</title>
 	<script type="text/javascript" src="../node_modules/moment/moment.js"></script>
 	<script type="text/javascript" src="../dist/calendar.js"></script>
+	<style type="text/css">
+		.cc-invalid{
+			color:#aaa;
+		}
+		.cc-selected{
+			background:#f00;
+			color:#fff;
+		}
+	</style>
 </head>
 <body>
 	<script type="text/javascript">
 
 		var calendar = new Calendar({
-			weekStartDay:6
+			weekStartDay:1,
+			type:3
 		})
 	</script>
 	

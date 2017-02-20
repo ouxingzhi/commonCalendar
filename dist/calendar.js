@@ -4,6 +4,15 @@
 	(global.Calendar = factory());
 }(this, (function () { 'use strict';
 
+Array.prototype.indexOf = Array.prototype.indexOf || function(obj){
+	for(var i=0;i<this.length;i++){
+		if(obj === this[i]) return i;
+	}
+	return -1;
+};
+
+
+
 function CDate(date){
 	if(!(this instanceof CDate)){
 		return new CDate(date);
@@ -150,6 +159,24 @@ var createElement = function(html,rootTagName){
 	return el;
 };
 
+
+var addClass = function(el,cls){
+	var reg = new RegExp('(?:^|\\s+)' + cls + '(?:$|\\s+)','im');
+	!reg.test(el.className) && (el.className += ' ' + cls);
+};
+
+var delClass = function(el,cls){
+	var reg = new RegExp('(?:^|\\s+)' + cls + '(?:$|\\s+)','img');
+	el.className = el.className.replace(reg,' ');
+};
+
+var indexOfDate = function(arr,date){
+	for(var i=0;i<arr.length;i++){
+		if(arr[i] && arr[i].valueOf() === date.valueOf()) return i;
+	}
+	return -1;
+};
+
 var utils = {
 	CDate: CDate_1,
 	setZero: setZero_1,
@@ -157,7 +184,10 @@ var utils = {
 	diffMonth: diffMonth_1,
 	createMonth: createMonth,
 	weekNumToChina: weekNumToChina_1,
-	createElement: createElement
+	createElement: createElement,
+	addClass: addClass,
+	delClass: delClass,
+	indexOfDate: indexOfDate
 };
 
 var U = utils;
@@ -168,7 +198,7 @@ U.setZero(now);
 function noop(){}
 
 function CommonCalendar(ops){
-	this.type = CommonCalendar.TYPE_SINGLE;
+	this._type = CommonCalendar.TYPE_SINGLE;
 
 	this._select = new Date();
 
@@ -185,6 +215,8 @@ function CommonCalendar(ops){
 	this._hookCreateCalendarAfter = noop;
 
 	this._hookCreateCalendarDayAfter = noop;
+
+	this._time2DomMap = {};
 
 	//只在范围选择时，起作用
 	this._range_status = CommonCalendar.RANGE_STATUS_NOT_SELECT;
@@ -208,13 +240,15 @@ CommonCalendar.RANGE_STATUS_SELECT_FIRST = 1;
 // 选择第二个
 CommonCalendar.RANGE_STATUS_SELECT_SECOND = 2;
 
+var SELECT_CLS = 'cc-selected';
+
 CommonCalendar.prototype = {
 	constructor: CommonCalendar,
 	_setOption:function(ops){
 		ops = ops || {};
 
 		if(ops.type){
-			this.type = CommonCalendar.TYPE_SINGLE;
+			this._type = ops.type;
 		}
 		if(ops.startMonth){
 			this._startMonth = ops.startMonth;
@@ -253,8 +287,8 @@ CommonCalendar.prototype = {
 		this._rootBox.appendChild(this._container);
 	},
 	_initSelect:function(){
-		if(this._select){
-
+		if(this._type === CommonCalendar.TYPE_MULTI || this._type === CommonCalendar.TYPE_RANGE){
+			this._select = [];
 		}
 	},
 	_createWeekHeaderHtml:function(){
@@ -299,16 +333,20 @@ CommonCalendar.prototype = {
 		var invalid = month.getMonth() !== date.getMonth();
 		var diff = date - month;
 		if(invalid){
+			U.addClass(td,'cc-invalid');
 			td.className = [td.className,'cc-invalid'].join(' ');
+		}else{
+			this._time2DomMap[date.valueOf()] = td;
 		}
 		if(now.valueOf() === date.valueOf()){
-			td.className = [td.className,'cc-today'].join(' ');
+			U.addClass(td,'cc-today');
 		}
+		var self = this;
 		td.addEventListener("click",function(e){
 			if(invalid){
 				return;
 			}
-
+			self._selectDate(date);
 		},false);
 		
 	},
@@ -328,18 +366,116 @@ CommonCalendar.prototype = {
 	// single 模式 只接受一个date对象
 	// mutli 模式 可接受多个date对象的数组
 	// range 模式 可以接受两个date对象的数组，第0个为开始时间，第1个为结束时间
-	selectDate:function(date){
+	_selectDate:function(date){
+		date = U.clone(date,true);
 		if(this._type === CommonCalendar.TYPE_SINGLE){
-			
+			this._selectSingleDate(date);
 		}else if(this._type === CommonCalendar.TYPE_MULTI){
-
+			this._selectMutliDate(date);
 		}else if(this._type === CommonCalendar.TYPE_RANGE){
-
+			this._selectRangeDate(date);
 		}
 	},
-	selectDateByWeek:function(week){
-
+	_selectDayDom:function(date){
+		var selectDom = this._time2DomMap[date.valueOf()];
+		if(selectDom){
+			U.addClass(selectDom, SELECT_CLS);
+		}
 	},
+	_unSelectDayDom:function(date){
+		var selectDom = this._time2DomMap[date.valueOf()];
+		if(selectDom){
+			U.delClass(selectDom, SELECT_CLS);
+		}
+	},
+	_selectSingleDate:function(date){
+		if(this._select && this._select instanceof Date){
+			this._unSelectDayDom(this._select);
+		}
+		if(date && date instanceof Date){
+			this._selectDayDom(date);
+		}
+	},
+
+	_selectMutliDate:function(date){
+		var index = U.indexOfDate(this._select,date);
+		if(index > -1){
+			this._select.splice(index,1);
+			this._unSelectDayDom(date);
+		}else{
+			this._select.push(date);
+			this._selectDayDom(date);
+		}
+	},
+	_selectRangeDate:function(date){
+		if(this._range_status === CommonCalendar.RANGE_STATUS_NOT_SELECT){
+			this._select = [date];
+			this._selectDayDom(date);
+			this._range_status = CommonCalendar.RANGE_STATUS_SELECT_FIRST;
+		}else if(this._range_status === CommonCalendar.RANGE_STATUS_SELECT_FIRST){
+			var start = this._select[0];
+			var end = date;
+			if(date.valueOf() < start.valueOf()){
+				var tmp = start;
+				start = end;
+				end = tmp;
+			}
+			this._select = this._findDateMonthRange(start,end);
+			var select = this._select;
+			for(var i=0; i<select.length; i++){
+				this._selectDayDom(select[i]);
+			}
+			this._range_status = CommonCalendar.RANGE_STATUS_SELECT_SECOND;
+		}else if(this._range_status === CommonCalendar.RANGE_STATUS_SELECT_SECOND){
+			var select = this._select || [];
+			for(var i=0; i<select.length; i++){
+				this._unSelectDayDom(select[i]);
+			}
+			this._select = [date];
+			this._selectDayDom(date);
+			this._range_status = CommonCalendar.RANGE_STATUS_SELECT_FIRST;
+		}
+	},
+	_findDateMonthRange:function(start,end){
+		var list = [];
+		var map = this._time2DomMap;
+		var cur;
+		var s = start.valueOf();
+		var e = end.valueOf();
+		for(var i in map){
+			i = parseInt(i);
+			if(s <= i && i <= e){
+				list.push(new Date(i));
+			}
+		}
+		return list;
+	},
+	selectDateByWeek:function(week){
+		var map = this._time2DomMap;
+		var select = [];
+		var cur;
+		for(var i in map){
+			cur = U.clone(parseInt(i),true);
+			if(cur.getDay() === week){
+				select.push(cur);
+				this._selectDayDom(cur);
+			}
+		}
+		this._select.splice(0);
+		this._select = select;
+	},
+	select:function(date){
+		if(this._type === CommonCalendar.TYPE_SINGLE){
+			this._selectSingleDate(date);
+		}else if(this._type === CommonCalendar.TYPE_MULTI){
+			for(var i=0;i<date.length;i++){
+				this._selectMutliDate(U.clone(date[i],true));
+			}
+		}else if(this._type === CommonCalendar.TYPE_RANGE){
+			this._selectMutliDate(U.clone(date[0],true));
+			this._selectMutliDate(U.clone(date[1],true));
+		}
+	}
 };
 
 var index = CommonCalendar;
