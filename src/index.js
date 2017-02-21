@@ -24,12 +24,20 @@ function CommonCalendar(ops){
 
 	this._hookCreateCalendarAfter = noop;
 
-	this._hookCreateCalendarDayAfter = noop;
+	this._hookCreateCalendarCellAfter = noop;
+
+	this._hookCreateCalendarRowAfter = noop;
+
+	this._hookCreateCalendarHeaderCellAfter = noop;
+
+	this._hookCreateCalendarHeaderRowAfter = noop;
 
 	this._time2DomMap = {};
 
 	//只在范围选择时，起作用
 	this._range_status = CommonCalendar.RANGE_STATUS_NOT_SELECT;
+
+	this._events = {};
 
 	this._setOption(ops);
 	this._init();
@@ -75,11 +83,21 @@ CommonCalendar.prototype = {
 				this._weekStartDay = this._weekStartDay%7;
 			}
 		}
+
 		if(ops.hookCalendarAfter){
 			this._hookCalendarAfter = ops.hookCalendarAfter;
 		}
-		if(ops.hookCreateCalendarDayAfter){
-			this._hookCreateCalendarDayAfter = ops.hookCreateCalendarDayAfter;
+		if(ops.hookCreateCalendarCellAfter){
+			this._hookCreateCalendarCellAfter = ops.hookCreateCalendarCellAfter;
+		}
+		if(ops.hookCreateCalendarRowAfter){
+			this._hookCreateCalendarRowAfter = ops.hookCreateCalendarRowAfter;
+		}
+		if(ops.hookCreateCalendarHeaderCellAfter){
+			this._hookCreateCalendarHeaderCellAfter = ops.hookCreateCalendarHeaderCellAfter;
+		}
+		if(ops.hookCreateCalendarHeaderRowAfter){
+			this._hookCreateCalendarHeaderRowAfter = ops.hookCreateCalendarHeaderRowAfter;
 		}
 	},
 	_init:function(){
@@ -88,10 +106,16 @@ CommonCalendar.prototype = {
 		this._initSelect();
 	},
 	_initDom:function(){
+		if(!this._endMonth || this._endMonth < this._startMonth){
+			this._endMonth = this._startMonth;
+		}
 		var diff = U.diffMonth(this._startMonth,this._endMonth);
 		this._container = U.createElement('<div class="calendar-box"></div>');
+		var table;
 		for(var i=0; i<=diff; i++){
-			this._container.appendChild(this._createMonthHtml(U.CDate(this._startMonth).addMonth(i).valueOf()));
+			table = this._createMonthHtml(U.CDate(this._startMonth).addMonth(i).valueOf());
+			this._container.appendChild(table);
+			if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(table);
 		}
 		if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(this._container);
 		this._rootBox.appendChild(this._container);
@@ -99,7 +123,13 @@ CommonCalendar.prototype = {
 	_initSelect:function(){
 		if(this._type === CommonCalendar.TYPE_MULTI || this._type === CommonCalendar.TYPE_RANGE){
 			this._select = [];
+		}else{
+			this._select = null;
 		}
+	},
+	_clear:function(){
+		this._container.parentNode.removeChild(this._container);
+		this._container = null;
 	},
 	_createWeekHeaderHtml:function(){
 		var i;
@@ -107,9 +137,13 @@ CommonCalendar.prototype = {
 		var tr = document.createElement('tr');
 		//htmls.push('<tr>');
 		for(i=0;i<7;i++){
-			tr.appendChild(this.createWeekHeaderCell(weekStartDay++));
+			var th = this.createWeekHeaderCell(weekStartDay);
+			this._hookCreateCalendarHeaderCellAfter(th,weekStartDay);
+			tr.appendChild(th);
+			weekStartDay++
 		}
 		//htmls.push('</tr>');
+		this._hookCreateCalendarHeaderRowAfter(tr);
 		return tr;
 	},
 	_createMonthHtml:function(date){
@@ -125,8 +159,9 @@ CommonCalendar.prototype = {
 				td = this.createDayCell(month[i][ii],date);
 				tr.appendChild(td);
 				this._initCalendarDayCell(td,month[i][ii],date);
-				this._hookCreateCalendarDayAfter(td,month[i][ii],date);
+				this._hookCreateCalendarCellAfter(td,month[i][ii],date);
 			}
+			if(typeof this._hookCreateCalendarRowAfter === 'function') this._hookCreateCalendarRowAfter(tr);
 			table.appendChild(tr)
 			// row.push('</tr>');
 			// line.push(row.join(''));
@@ -157,6 +192,7 @@ CommonCalendar.prototype = {
 				return;
 			}
 			self._selectDate(date);
+			self.emit('dayClick',e,date);
 		},false);
 		
 	},
@@ -260,31 +296,80 @@ CommonCalendar.prototype = {
 		}
 		return list;
 	},
-	selectDateByWeek:function(week){
+	selectOf:function(fn){
+		if(this._type !== CommonCalendar.TYPE_MULTI || !fn) return;
+
 		var map = this._time2DomMap;
 		var select = [];
 		var cur;
 		for(var i in map){
 			cur = U.clone(parseInt(i),true);
-			if(cur.getDay() === week){
+			if(fn(cur)){
 				select.push(cur);
 				this._selectDayDom(cur)
 			}
 		}
-		this._select.splice(0);
-		this._select = select;
+		U.mergeDate(this._select,select);
+	},
+	unSelectOf:function(fn){
+		if(this._type !== CommonCalendar.TYPE_MULTI || !fn) return;
+
+		var map = this._time2DomMap;
+		var unselect = [];
+		var cur;
+		for(var i in map){
+			cur = U.clone(parseInt(i),true);
+			if(fn(cur)){
+				unselect.push(cur);
+				this._unSelectDayDom(cur)
+			}
+		}
+		U.deleteDate(this._select,unselect);
 	},
 	select:function(date){
+		date = date || new Date();
 		if(this._type === CommonCalendar.TYPE_SINGLE){
-			this._selectSingleDate(date);
+			this._selectSingleDate(U.clone(date,true));
 		}else if(this._type === CommonCalendar.TYPE_MULTI){
+			if(!(date instanceof Array)) date = [date];
 			for(var i=0;i<date.length;i++){
 				this._selectMutliDate(U.clone(date[i],true))
 			}
 		}else if(this._type === CommonCalendar.TYPE_RANGE){
+			this._range_status = CommonCalendar.RANGE_STATUS_NOT_SELECT;
 			this._selectMutliDate(U.clone(date[0],true));
 			this._selectMutliDate(U.clone(date[1],true));
 		}
+	},
+	getSelect:function(){
+		return this._select;
+	},
+	on:function(eventName,fn){
+		var eves = this._events[eventName] = this._events[eventName] || [];
+		(typeof fn === 'function') && eves.push(fn);
+	},
+	off:function(eventName,fn){
+		var eves = this._events[eventName] = this._events[eventName] || [];
+		if(fn){
+			var index = eves.indexOf(fn);
+			eves.splice(index,1);
+		}else{
+			this._events[eventName] = [];
+		}
+	},
+	emit:function(eventName){
+		var eves = this._events[eventName] = this._events[eventName] || [];
+		var args = [].slice.call(arguments,1);
+		for(var i=0;i<eves.length;i++){
+			if(typeof eves[i] === 'function'){
+				eves[i].apply(this,args);
+			}
+		}
+	},
+	update:function(ops){
+		this._clear();
+		this._setOption(ops);
+		this._init();
 	}
 };
 

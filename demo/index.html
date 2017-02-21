@@ -3,6 +3,9 @@
 <head>
 	<meta charset="UTF-8">
 	<title>common calendar</title>
+		<!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
+	<link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
 	<script type="text/javascript" src="../node_modules/moment/moment.js"></script>
 	<script type="text/javascript" src="../dist/calendar.js"></script>
 	<style type="text/css">
@@ -13,15 +16,61 @@
 			background:#f00;
 			color:#fff;
 		}
+		.table th{
+			text-align: center;
+
+		}
+		.table{
+			text-align: center;
+			line-height:30px;
+		}
 	</style>
 </head>
 <body>
+	<input type="button" value="上一月" id="btn">
+	<span id="timeshow"></span>
+	<input type="button" value="下一月" id="btn2">
 	<script type="text/javascript">
-
+		var date = new Date();
 		var calendar = new Calendar({
+			startMonth:date,
 			weekStartDay:1,
-			type:3
-		})
+			type:Calendar.TYPE_MULTI,
+			hookCalendarAfter:function(table){
+				table.className = "table"
+			},
+			hookCreateCalendarHeaderCellAfter:function(th,week){
+				th.addEventListener("click",function(){
+					week = week == 7 ? 0 : week;
+					calendar.selectOf(function(date){
+						return date.getDay() == week;
+					})
+				});
+			}
+		});
+		function $(id){
+			return document.getElementById(id);
+		}
+
+		
+		var timeshow = $('timeshow');
+		timeshow.innerHTML = date.getFullYear() + "-" + (date.getMonth()+1);
+		var btn = $('btn');
+		btn.addEventListener("click",function(){
+			date.setMonth(date.getMonth()-1);
+			timeshow.innerHTML = date.getFullYear() + "-" + (date.getMonth()+1);
+			calendar.update({
+				startMonth: date
+			})
+		});
+		var btn2 = $('btn2');
+		btn2.addEventListener("click",function(){
+			date.setMonth(date.getMonth()+1);
+			timeshow.innerHTML = date.getFullYear() + "-" + (date.getMonth()+1);
+			calendar.update({
+				startMonth: date
+			})
+		});
 	</script>
 	
 </body>

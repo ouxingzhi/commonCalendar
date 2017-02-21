@@ -130,12 +130,15 @@ exports.createMonth = function(month, startDay){
 
 
 	firstDate.setDate(startNum);
-	var endNum = 7 - Math.abs(startNum);
-	var end = lastDate.getDate() + Math.abs(startNum) + Math.abs(endNum);
+	var absStartNum = Math.abs(startNum)
+	var endNum = function(total){
+		var t = total % 7;
+		return t === 0 ? 0 : (7 - t);
+	}(absStartNum+lastDate.getDate());
+	var end = lastDate.getDate() + absStartNum + endNum;
 	var cur;
 	var weeks = [];
 	var week = [];
-	console.log(startNum,endNum);
 	for(var i=1;i<=end;i++){
 		cur = CDate(firstDate).addDay(i);
 		//console.log(cur.date.toLocaleDateString(),cur.date.getDay());
@@ -195,3 +198,22 @@ exports.indexOfDate = function(arr,date){
 	return -1;
 }
 
+exports.mergeDate = function(a,b){
+	b = b || []
+	for(var i=0;i<b.length;i++){
+		if(exports.indexOfDate(a,b[i]) === -1){
+			a.push(b[i])
+		}
+	}
+}
+
+exports.deleteDate = function(a,b){
+	b = b || [];
+	var index;
+	for(var i=0;i<b.length;i++){
+		index = exports.indexOfDate(a,b[i])
+		if(index > -1){
+			a.splice(index,1);
+		}
+	}
+}

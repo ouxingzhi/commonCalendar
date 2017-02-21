@@ -4,6 +4,13 @@
 	(global.Calendar = factory());
 }(this, (function () { 'use strict';
 
+function createCommonjsModule(fn, module) {
+	return module = { exports: {} }, fn(module, module.exports), module.exports;
+}
+
+var utils = createCommonjsModule(function (module, exports) {
+"use strict";
+
 Array.prototype.indexOf = Array.prototype.indexOf || function(obj){
 	for(var i=0;i<this.length;i++){
 		if(obj === this[i]) return i;
@@ -47,14 +54,14 @@ CDate.prototype = {
 	}
 };
 
-var CDate_1 = CDate;
+exports.CDate = CDate;
 
 var setZero = function(date){
 	date.setHours(0,0,0,1);
 	return date;
 };
 
-var setZero_1 = setZero;
+exports.setZero = setZero;
 
 var clone = function(date, isZero){
 	date = new Date(date.valueOf());
@@ -64,7 +71,7 @@ var clone = function(date, isZero){
 	return date;
 };
 
-var clone_1 = clone;
+exports.clone = clone;
 
 var getMonthFirstDay = function(month){
 	month = clone(month,true);
@@ -77,6 +84,28 @@ var getMonthLastDay = function(month){
 	month = clone(month,true);
 	month.setMonth(month.getMonth()+1);
 	month.setDate(0);
+	return month;
+};
+
+var setNextMonthFirstDay = function(month){
+	month.setMonth(month.getMonth()+1);
+	setZero(month);
+};
+
+var setPreMonthLastDay = function(month){
+	month.setDate(0);
+	setZero(month);
+};
+
+var getNextMonthFirstDay = function(month){
+	month = clone(month);
+	setNextMonthFirstDay(month);
+	return month;
+};
+
+var getPreMonthLastDay = function(month){
+	month = clone(month);
+	setPreMonthLastDay(month);
 	return month;
 };
 
@@ -93,9 +122,9 @@ var diffMonth = function(a, b){
 	return i;
 };
 
-var diffMonth_1 = diffMonth;
+exports.diffMonth = diffMonth;
 
-var createMonth = function(month, startDay){
+exports.createMonth = function(month, startDay){
 	month = clone(month);
 	setZero(month);
 	startDay = startDay || 0;
@@ -112,12 +141,15 @@ var createMonth = function(month, startDay){
 
 
 	firstDate.setDate(startNum);
-	var endNum = 7 - Math.abs(startNum);
-	var end = lastDate.getDate() + Math.abs(startNum) + Math.abs(endNum);
+	var absStartNum = Math.abs(startNum);
+	var endNum = function(total){
+		var t = total % 7;
+		return t === 0 ? 0 : (7 - t);
+	}(absStartNum+lastDate.getDate());
+	var end = lastDate.getDate() + absStartNum + endNum;
 	var cur;
 	var weeks = [];
 	var week = [];
-	console.log(startNum,endNum);
 	for(var i=1;i<=end;i++){
 		cur = CDate(firstDate).addDay(i);
 		//console.log(cur.date.toLocaleDateString(),cur.date.getDay());
@@ -147,9 +179,9 @@ var weekNumToChina = function(week){
 	return WEEKMAP[week];
 };
 
-var weekNumToChina_1 = weekNumToChina;
+exports.weekNumToChina = weekNumToChina;
 
-var createElement = function(html,rootTagName){
+exports.createElement = function(html,rootTagName){
 	rootTagName = rootTagName || 'div';
 	var c = document.createElement(rootTagName);
 	c.innerHTML = html;
@@ -160,35 +192,43 @@ var createElement = function(html,rootTagName){
 };
 
 
-var addClass = function(el,cls){
+exports.addClass = function(el,cls){
 	var reg = new RegExp('(?:^|\\s+)' + cls + '(?:$|\\s+)','im');
 	!reg.test(el.className) && (el.className += ' ' + cls);
 };
 
-var delClass = function(el,cls){
+exports.delClass = function(el,cls){
 	var reg = new RegExp('(?:^|\\s+)' + cls + '(?:$|\\s+)','img');
 	el.className = el.className.replace(reg,' ');
 };
 
-var indexOfDate = function(arr,date){
+exports.indexOfDate = function(arr,date){
 	for(var i=0;i<arr.length;i++){
 		if(arr[i] && arr[i].valueOf() === date.valueOf()) return i;
 	}
 	return -1;
 };
 
-var utils = {
-	CDate: CDate_1,
-	setZero: setZero_1,
-	clone: clone_1,
-	diffMonth: diffMonth_1,
-	createMonth: createMonth,
-	weekNumToChina: weekNumToChina_1,
-	createElement: createElement,
-	addClass: addClass,
-	delClass: delClass,
-	indexOfDate: indexOfDate
+exports.mergeDate = function(a,b){
+	b = b || [];
+	for(var i=0;i<b.length;i++){
+		if(exports.indexOfDate(a,b[i]) === -1){
+			a.push(b[i]);
+		}
+	}
 };
+
+exports.deleteDate = function(a,b){
+	b = b || [];
+	var index;
+	for(var i=0;i<b.length;i++){
+		index = exports.indexOfDate(a,b[i]);
+		if(index > -1){
+			a.splice(index,1);
+		}
+	}
+};
+});
 
 var U = utils;
 
@@ -214,12 +254,20 @@ function CommonCalendar(ops){
 
 	this._hookCreateCalendarAfter = noop;
 
-	this._hookCreateCalendarDayAfter = noop;
+	this._hookCreateCalendarCellAfter = noop;
+
+	this._hookCreateCalendarRowAfter = noop;
+
+	this._hookCreateCalendarHeaderCellAfter = noop;
+
+	this._hookCreateCalendarHeaderRowAfter = noop;
 
 	this._time2DomMap = {};
 
 	//只在范围选择时，起作用
 	this._range_status = CommonCalendar.RANGE_STATUS_NOT_SELECT;
+
+	this._events = {};
 
 	this._setOption(ops);
 	this._init();
@@ -265,11 +313,21 @@ CommonCalendar.prototype = {
 				this._weekStartDay = this._weekStartDay%7;
 			}
 		}
+
 		if(ops.hookCalendarAfter){
 			this._hookCalendarAfter = ops.hookCalendarAfter;
 		}
-		if(ops.hookCreateCalendarDayAfter){
-			this._hookCreateCalendarDayAfter = ops.hookCreateCalendarDayAfter;
+		if(ops.hookCreateCalendarCellAfter){
+			this._hookCreateCalendarCellAfter = ops.hookCreateCalendarCellAfter;
+		}
+		if(ops.hookCreateCalendarRowAfter){
+			this._hookCreateCalendarRowAfter = ops.hookCreateCalendarRowAfter;
+		}
+		if(ops.hookCreateCalendarHeaderCellAfter){
+			this._hookCreateCalendarHeaderCellAfter = ops.hookCreateCalendarHeaderCellAfter;
+		}
+		if(ops.hookCreateCalendarHeaderRowAfter){
+			this._hookCreateCalendarHeaderRowAfter = ops.hookCreateCalendarHeaderRowAfter;
 		}
 	},
 	_init:function(){
@@ -278,10 +336,16 @@ CommonCalendar.prototype = {
 		this._initSelect();
 	},
 	_initDom:function(){
+		if(!this._endMonth || this._endMonth < this._startMonth){
+			this._endMonth = this._startMonth;
+		}
 		var diff = U.diffMonth(this._startMonth,this._endMonth);
 		this._container = U.createElement('<div class="calendar-box"></div>');
+		var table;
 		for(var i=0; i<=diff; i++){
-			this._container.appendChild(this._createMonthHtml(U.CDate(this._startMonth).addMonth(i).valueOf()));
+			table = this._createMonthHtml(U.CDate(this._startMonth).addMonth(i).valueOf());
+			this._container.appendChild(table);
+			if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(table);
 		}
 		if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(this._container);
 		this._rootBox.appendChild(this._container);
@@ -289,7 +353,13 @@ CommonCalendar.prototype = {
 	_initSelect:function(){
 		if(this._type === CommonCalendar.TYPE_MULTI || this._type === CommonCalendar.TYPE_RANGE){
 			this._select = [];
+		}else{
+			this._select = null;
 		}
+	},
+	_clear:function(){
+		this._container.parentNode.removeChild(this._container);
+		this._container = null;
 	},
 	_createWeekHeaderHtml:function(){
 		var i;
@@ -297,9 +367,13 @@ CommonCalendar.prototype = {
 		var tr = document.createElement('tr');
 		//htmls.push('<tr>');
 		for(i=0;i<7;i++){
-			tr.appendChild(this.createWeekHeaderCell(weekStartDay++));
+			var th = this.createWeekHeaderCell(weekStartDay);
+			this._hookCreateCalendarHeaderCellAfter(th,weekStartDay);
+			tr.appendChild(th);
+			weekStartDay++;
 		}
 		//htmls.push('</tr>');
+		this._hookCreateCalendarHeaderRowAfter(tr);
 		return tr;
 	},
 	_createMonthHtml:function(date){
@@ -315,8 +389,9 @@ CommonCalendar.prototype = {
 				td = this.createDayCell(month[i][ii],date);
 				tr.appendChild(td);
 				this._initCalendarDayCell(td,month[i][ii],date);
-				this._hookCreateCalendarDayAfter(td,month[i][ii],date);
+				this._hookCreateCalendarCellAfter(td,month[i][ii],date);
 			}
+			if(typeof this._hookCreateCalendarRowAfter === 'function') this._hookCreateCalendarRowAfter(tr);
 			table.appendChild(tr);
 			// row.push('</tr>');
 			// line.push(row.join(''));
@@ -347,6 +422,7 @@ CommonCalendar.prototype = {
 				return;
 			}
 			self._selectDate(date);
+			self.emit('dayClick',e,date);
 		},false);
 		
 	},
@@ -450,31 +526,80 @@ CommonCalendar.prototype = {
 		}
 		return list;
 	},
-	selectDateByWeek:function(week){
+	selectOf:function(fn){
+		if(this._type !== CommonCalendar.TYPE_MULTI || !fn) return;
+
 		var map = this._time2DomMap;
 		var select = [];
 		var cur;
 		for(var i in map){
 			cur = U.clone(parseInt(i),true);
-			if(cur.getDay() === week){
+			if(fn(cur)){
 				select.push(cur);
 				this._selectDayDom(cur);
 			}
 		}
-		this._select.splice(0);
-		this._select = select;
+		U.mergeDate(this._select,select);
+	},
+	unSelectOf:function(fn){
+		if(this._type !== CommonCalendar.TYPE_MULTI || !fn) return;
+
+		var map = this._time2DomMap;
+		var unselect = [];
+		var cur;
+		for(var i in map){
+			cur = U.clone(parseInt(i),true);
+			if(fn(cur)){
+				unselect.push(cur);
+				this._unSelectDayDom(cur);
+			}
+		}
+		U.deleteDate(this._select,unselect);
 	},
 	select:function(date){
+		date = date || new Date();
 		if(this._type === CommonCalendar.TYPE_SINGLE){
-			this._selectSingleDate(date);
+			this._selectSingleDate(U.clone(date,true));
 		}else if(this._type === CommonCalendar.TYPE_MULTI){
+			if(!(date instanceof Array)) date = [date];
 			for(var i=0;i<date.length;i++){
 				this._selectMutliDate(U.clone(date[i],true));
 			}
 		}else if(this._type === CommonCalendar.TYPE_RANGE){
+			this._range_status = CommonCalendar.RANGE_STATUS_NOT_SELECT;
 			this._selectMutliDate(U.clone(date[0],true));
 			this._selectMutliDate(U.clone(date[1],true));
 		}
+	},
+	getSelect:function(){
+		return this._select;
+	},
+	on:function(eventName,fn){
+		var eves = this._events[eventName] = this._events[eventName] || [];
+		(typeof fn === 'function') && eves.push(fn);
+	},
+	off:function(eventName,fn){
+		var eves = this._events[eventName] = this._events[eventName] || [];
+		if(fn){
+			var index = eves.indexOf(fn);
+			eves.splice(index,1);
+		}else{
+			this._events[eventName] = [];
+		}
+	},
+	emit:function(eventName){
+		var eves = this._events[eventName] = this._events[eventName] || [];
+		var args = [].slice.call(arguments,1);
+		for(var i=0;i<eves.length;i++){
+			if(typeof eves[i] === 'function'){
+				eves[i].apply(this,args);
+			}
+		}
+	},
+	update:function(ops){
+		this._clear();
+		this._setOption(ops);
+		this._init();
 	}
 };
 
