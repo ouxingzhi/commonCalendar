@@ -76,6 +76,7 @@ CommonCalendar.prototype = {
 		}
 		if(ops.rootBox){
 			this._rootBox = ops.rootBox;
+			if(typeof this._rootBox === 'string') this._rootBox = document.querySelector(this._rootBox);
 		}
 		if(ops.weekStartDay){
 			this._weekStartDay = ops.weekStartDay;
@@ -84,8 +85,8 @@ CommonCalendar.prototype = {
 			}
 		}
 
-		if(ops.hookCalendarAfter){
-			this._hookCalendarAfter = ops.hookCalendarAfter;
+		if(ops.hookCreateCalendarAfter){
+			this._hookCreateCalendarAfter = ops.hookCreateCalendarAfter;
 		}
 		if(ops.hookCreateCalendarCellAfter){
 			this._hookCreateCalendarCellAfter = ops.hookCreateCalendarCellAfter;
@@ -106,6 +107,9 @@ CommonCalendar.prototype = {
 		this._initSelect();
 	},
 	_initDom:function(){
+		if(!this._rootBox){
+			throw new Error('rootBox is empty!');
+		}
 		if(!this._endMonth || this._endMonth < this._startMonth){
 			this._endMonth = this._startMonth;
 		}
@@ -115,9 +119,8 @@ CommonCalendar.prototype = {
 		for(var i=0; i<=diff; i++){
 			table = this._createMonthHtml(U.CDate(this._startMonth).addMonth(i).valueOf());
 			this._container.appendChild(table);
-			if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(table);
+			if(typeof this._hookCreateCalendarAfter === 'function') this._hookCreateCalendarAfter(table);
 		}
-		if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(this._container);
 		this._rootBox.appendChild(this._container);
 	},
 	_initSelect:function(){
@@ -159,7 +162,7 @@ CommonCalendar.prototype = {
 				td = this.createDayCell(month[i][ii],date);
 				tr.appendChild(td);
 				this._initCalendarDayCell(td,month[i][ii],date);
-				this._hookCreateCalendarCellAfter(td,month[i][ii],date);
+				if(typeof this._hookCreateCalendarCellAfter === 'function') this._hookCreateCalendarCellAfter(td,month[i][ii],date);
 			}
 			if(typeof this._hookCreateCalendarRowAfter === 'function') this._hookCreateCalendarRowAfter(tr);
 			table.appendChild(tr)
@@ -373,4 +376,8 @@ CommonCalendar.prototype = {
 	}
 };
 
+CommonCalendar.format = U.format;
+CommonCalendar.parse = U.parse;
+
 module.exports = CommonCalendar;
+

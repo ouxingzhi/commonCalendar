@@ -217,3 +217,98 @@ exports.deleteDate = function(a,b){
 		}
 	}
 }
+
+var formatReg = /[a-z]/img;
+var format = function(date,str){
+	return str.replace(formatReg,function(a){
+		if(FORMATFN[a]){
+			return FORMATFN[a](a);
+		}
+		return a;
+	});
+}
+
+exports.format = format;
+
+function fillZore(i,l){
+	l = l || 2;
+	i = String(i);
+	var len = l - i.length;
+	return len > 0 ? (Array(len+1).join('0') + i) : i;
+}
+var WEEK_VAL = ['日','一','二','三','四','五','六'];
+
+var FORMATFN = {
+	//带0的天
+	d:function(date){
+		return fillZore(date.getDate());
+	},
+	//不带0的天
+	j:function(date){
+		return date.getDate();
+	},
+	//周1-7
+	N:function(date){
+		var week = date.getDay();
+		return week === 0 ? 7 : week;
+	},
+	//周0-6
+	w:function(date){
+		return date.getDay();
+	},
+	//周一到周日
+	W:function(date){
+		var w = date.getDay();
+		return WEEK_VAL[w];
+	},
+	//带0的月
+	m:function(date){
+		return fillZore(date.getMonth()+1);
+	},
+	//不带0的月
+	n:function(date){
+		return date.getMonth()+1;
+	},
+	//4位年
+	Y:function(date){
+		return date.getFullYear();
+	},
+	//2位年
+	y:function(date){
+		return String(date.getFullYear()).replace(/^\d{2}/,'');
+	},
+	//不带零的12小时制
+	g:function(date){
+		var hours = date.getHours();
+		return hours > 12 ? (hours - 12) : hours;
+	},
+	//不带零的24小时制
+	G:function(date){
+		return date.getHours();
+	},
+	//带零的12小时制
+	h:function(date){
+		var hours = date.getHours();
+		return fillZore(hours > 12 ? (hours - 12) : hours);
+	},
+	//带零的24小时制
+	H:function(date){
+		return fillZore(date.getHours());
+	},
+	//有前导零的分钟数
+	i:function(date){
+		return fillZore(date.getMinutes())
+	},
+	//秒数，有前导零
+	s:function(date){
+		return fillZore(date.getSeconds())
+	},
+	//毫秒
+	u:function(date){
+		return fillZore(date.getMilliseconds(),3);
+	}
+}
+
+exports.parse = function(str){
+	return new Date(Date.parse(str.replace(/-/g,'/')));
+}

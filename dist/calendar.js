@@ -228,6 +228,101 @@ exports.deleteDate = function(a,b){
 		}
 	}
 };
+
+var formatReg = /[a-z]/img;
+var format = function(date,str){
+	return str.replace(formatReg,function(a){
+		if(FORMATFN[a]){
+			return FORMATFN[a](a);
+		}
+		return a;
+	});
+};
+
+exports.format = format;
+
+function fillZore(i,l){
+	l = l || 2;
+	i = String(i);
+	var len = l - i.length;
+	return len > 0 ? (Array(len+1).join('0') + i) : i;
+}
+var WEEK_VAL = ['日','一','二','三','四','五','六'];
+
+var FORMATFN = {
+	//带0的天
+	d:function(date){
+		return fillZore(date.getDate());
+	},
+	//不带0的天
+	j:function(date){
+		return date.getDate();
+	},
+	//周1-7
+	N:function(date){
+		var week = date.getDay();
+		return week === 0 ? 7 : week;
+	},
+	//周0-6
+	w:function(date){
+		return date.getDay();
+	},
+	//周一到周日
+	W:function(date){
+		var w = date.getDay();
+		return WEEK_VAL[w];
+	},
+	//带0的月
+	m:function(date){
+		return fillZore(date.getMonth()+1);
+	},
+	//不带0的月
+	n:function(date){
+		return date.getMonth()+1;
+	},
+	//4位年
+	Y:function(date){
+		return date.getFullYear();
+	},
+	//2位年
+	y:function(date){
+		return String(date.getFullYear()).replace(/^\d{2}/,'');
+	},
+	//不带零的12小时制
+	g:function(date){
+		var hours = date.getHours();
+		return hours > 12 ? (hours - 12) : hours;
+	},
+	//不带零的24小时制
+	G:function(date){
+		return date.getHours();
+	},
+	//带零的12小时制
+	h:function(date){
+		var hours = date.getHours();
+		return fillZore(hours > 12 ? (hours - 12) : hours);
+	},
+	//带零的24小时制
+	H:function(date){
+		return fillZore(date.getHours());
+	},
+	//有前导零的分钟数
+	i:function(date){
+		return fillZore(date.getMinutes())
+	},
+	//秒数，有前导零
+	s:function(date){
+		return fillZore(date.getSeconds())
+	},
+	//毫秒
+	u:function(date){
+		return fillZore(date.getMilliseconds(),3);
+	}
+};
+
+exports.parse = function(str){
+	return new Date(Date.parse(str.replace(/-/g,'/')));
+};
 });
 
 var U = utils;
@@ -306,6 +401,7 @@ CommonCalendar.prototype = {
 		}
 		if(ops.rootBox){
 			this._rootBox = ops.rootBox;
+			if(typeof this._rootBox === 'string') this._rootBox = document.querySelector(this._rootBox);
 		}
 		if(ops.weekStartDay){
 			this._weekStartDay = ops.weekStartDay;
@@ -314,8 +410,8 @@ CommonCalendar.prototype = {
 			}
 		}
 
-		if(ops.hookCalendarAfter){
-			this._hookCalendarAfter = ops.hookCalendarAfter;
+		if(ops.hookCreateCalendarAfter){
+			this._hookCreateCalendarAfter = ops.hookCreateCalendarAfter;
 		}
 		if(ops.hookCreateCalendarCellAfter){
 			this._hookCreateCalendarCellAfter = ops.hookCreateCalendarCellAfter;
@@ -336,6 +432,9 @@ CommonCalendar.prototype = {
 		this._initSelect();
 	},
 	_initDom:function(){
+		if(!this._rootBox){
+			throw new Error('rootBox is empty!');
+		}
 		if(!this._endMonth || this._endMonth < this._startMonth){
 			this._endMonth = this._startMonth;
 		}
@@ -345,9 +444,8 @@ CommonCalendar.prototype = {
 		for(var i=0; i<=diff; i++){
 			table = this._createMonthHtml(U.CDate(this._startMonth).addMonth(i).valueOf());
 			this._container.appendChild(table);
-			if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(table);
+			if(typeof this._hookCreateCalendarAfter === 'function') this._hookCreateCalendarAfter(table);
 		}
-		if(typeof this._hookCalendarAfter === 'function') this._hookCalendarAfter(this._container);
 		this._rootBox.appendChild(this._container);
 	},
 	_initSelect:function(){
@@ -389,7 +487,7 @@ CommonCalendar.prototype = {
 				td = this.createDayCell(month[i][ii],date);
 				tr.appendChild(td);
 				this._initCalendarDayCell(td,month[i][ii],date);
-				this._hookCreateCalendarCellAfter(td,month[i][ii],date);
+				if(typeof this._hookCreateCalendarCellAfter === 'function') this._hookCreateCalendarCellAfter(td,month[i][ii],date);
 			}
 			if(typeof this._hookCreateCalendarRowAfter === 'function') this._hookCreateCalendarRowAfter(tr);
 			table.appendChild(tr);
@@ -602,6 +700,9 @@ CommonCalendar.prototype = {
 		this._init();
 	}
 };
+
+CommonCalendar.format = U.format;
+CommonCalendar.parse = U.parse;
 
 var index = CommonCalendar;
 
